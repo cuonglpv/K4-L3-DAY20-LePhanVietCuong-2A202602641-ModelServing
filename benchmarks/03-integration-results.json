@@ -1,0 +1,104 @@
+{
+  "backend": "lakehouse vector index (265 chunks) + llama-server /v1/embeddings",
+  "mean_ms": {
+    "embed": 390.6,
+    "retrieve": 0.1,
+    "llm": 3563.3,
+    "total": 3983.4
+  },
+  "results": [
+    {
+      "query": "Why is goodput more useful than raw throughput?",
+      "answer": "Goodput@SLO counts only the requests per second that met the TTFT and TPOT targets.",
+      "contexts": [
+        {
+          "id": "docs/labs/02-serve.md#4",
+          "score": 0.7302
+        },
+        {
+          "id": "data/corpus/serving-notes.md#3",
+          "score": 0.7136
+        },
+        {
+          "id": "data/corpus/serving-notes.md#2",
+          "score": 0.713
+        }
+      ],
+      "embed_backend": "lakehouse vector index (265 chunks) + llama-server /v1/embeddings",
+      "timings_ms": {
+        "embed": 718.9,
+        "retrieve": 0.2,
+        "llm": 3467.6,
+        "total": 4274.6
+      },
+      "server_timings": {
+        "prompt_n": 378,
+        "prompt_ms": 2006.891,
+        "predicted_n": 22,
+        "predicted_ms": 1298.578
+      }
+    },
+    {
+      "query": "What problem does PagedAttention actually solve?",
+      "answer": "PagedAttention stores the KV cache in non-contiguous pages, removing the internal fragmentation that wasted most GPU memory.",
+      "contexts": [
+        {
+          "id": "data/corpus/serving-notes.md#0",
+          "score": 0.714
+        },
+        {
+          "id": "data/corpus/serving-notes.md#2",
+          "score": 0.6791
+        },
+        {
+          "id": "docs/labs/02-serve.md#5",
+          "score": 0.6764
+        }
+      ],
+      "embed_backend": "lakehouse vector index (265 chunks) + llama-server /v1/embeddings",
+      "timings_ms": {
+        "embed": 204.2,
+        "retrieve": 0.1,
+        "llm": 3283.2,
+        "total": 3487.6
+      },
+      "server_timings": {
+        "prompt_n": 335,
+        "prompt_ms": 1716.859,
+        "predicted_n": 23,
+        "predicted_ms": 1355.833
+      }
+    },
+    {
+      "query": "When does splitting prefill and decode help?",
+      "answer": "Splitting prefill and decode helps when long prompts would otherwise stall the decode of other requests.",
+      "contexts": [
+        {
+          "id": "data/corpus/serving-notes.md#2",
+          "score": 0.7756
+        },
+        {
+          "id": "data/corpus/serving-notes.md#1",
+          "score": 0.7021
+        },
+        {
+          "id": "docs/labs/03-integrate.md#5",
+          "score": 0.6994
+        }
+      ],
+      "embed_backend": "lakehouse vector index (265 chunks) + llama-server /v1/embeddings",
+      "timings_ms": {
+        "embed": 248.7,
+        "retrieve": 0.1,
+        "llm": 3939.2,
+        "total": 4188.0
+      },
+      "server_timings": {
+        "prompt_n": 346,
+        "prompt_ms": 2171.148,
+        "predicted_n": 20,
+        "predicted_ms": 1521.14
+      }
+    }
+  ]
+}

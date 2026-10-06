@@ -6,10 +6,10 @@
 >
 > `make verify` sẽ fail nếu còn placeholder chưa điền. Đó là cố ý.
 
-**Họ Tên:** _<Họ Tên>_
-**MSSV:** _<MSSV>_
-**Cohort:** _<A20-K1 / A20-K2 / ...>_
-**Ngày submit:** _<YYYY-MM-DD>_
+**Họ Tên:** Lê Phan Việt Cường
+**MSSV:** 2A202602641
+**Cohort:** K4-L3
+**Ngày submit:** 2026-10-06
 
 ---
 
@@ -17,23 +17,23 @@
 
 > Từ `make probe`. Paste output hoặc điền tay.
 
-- **OS:** _<macOS 14 / Windows 11 / Ubuntu 24.04 / ...>_
-- **CPU:** _<Apple M2 / Intel i7-12700H / AMD Ryzen 7 5800H>_
-- **Cores:** _<physical / logical>_
-- **CPU extensions:** _<AVX2 / AVX-512 / NEON / —>_
-- **RAM:** _<GB>_
-- **Accelerator:** _<NVIDIA RTX 4060 / Apple Metal / Vulkan / CPU only>_
-- **llama.cpp asset đã tải:** _<vd: llama-b10488-bin-macos-arm64.tar.gz>_
-- **Model đã dùng:** _<Gemma 4 E2B / Qwen3.5 0.8B>_ (`LAB_MODEL=`_<gemma4-e2b / qwen35-0.8b>_)
-- **Quantization:** _<primary>_ + _<compare>_ (từ `models/active.json`)
+- **OS:** Windows 11 (AMD64)
+- **CPU:** 11th Gen Intel Core i5-1130G7 @ 1.10GHz
+- **Cores:** 4 physical / 8 logical
+- **CPU extensions:** AVX-512 (llama.cpp tự nạp `ggml-cpu-icelake.dll`)
+- **RAM:** 15.7 GB
+- **Accelerator:** Vulkan (Intel Iris Xe iGPU, RAM dùng chung với CPU)
+- **llama.cpp asset đã tải:** llama-b10488-bin-win-vulkan-x64.zip
+- **Model đã dùng:** Gemma 4 E2B (`LAB_MODEL=gemma4-e2b`)
+- **Quantization:** UD-Q4_K_XL (primary) + UD-Q2_K_XL (compare) (từ `models/active.json`)
 
-**Chạy ở đâu:** _<laptop của tôi / Colab / Kaggle>_
+**Chạy ở đâu:** laptop của tôi
 _(Nếu dùng cloud fallback: nói rõ vì sao — RAM < 8 GB, setup fail, v.v. Không mất điểm.)_
 
 **Setup story** (≤ 80 chữ): điều gì cần thay đổi để lab chạy trên máy bạn? Có bước
 nào fail rồi phải workaround không?
 
-_Answer here._
+Hai chỗ phải xử lý. (1) `lab.ps1` lỗi parse trên Windows PowerShell 5.1 vì có em dash nhưng không có BOM UTF-8; tôi thêm BOM, đồng thời đặt `PYTHONUTF8=1` vì Python crash `UnicodeEncodeError` (cp1252) khi in ký tự `─` qua pipe. (2) Tải model bị kẹt ở ~10 KB/s; thử lại trên mạng nhanh hơn thì xong (setup resume được).
 
 ---
 
@@ -43,14 +43,14 @@ _Answer here._
 
 | Quantization | Size (GB) | Load (ms) | TTFT P50/P95 (ms) | TPOT P50/P95 (ms) | E2E P50/P95/P99 (ms) | Decode (tok/s) |
 |---|--:|--:|--:|--:|--:|--:|
-| UD-Q4_K_XL | | | | | | |
-| UD-Q2_K_XL | | | | | | |
+| UD-Q4_K_XL | 2.97 | 17526 | 752 / 3362 | 67.0 / 75.9 | 4944 / 8143 / 8143 | 14.9 |
+| UD-Q2_K_XL | 2.24 | 10892 | 1226 / 8568 | 127.5 / 136.1 | 9216 / 16195 / 16195 | 7.8 |
 
 **Quan sát** (≤ 60 chữ): 2-bit nhanh hơn bao nhiêu, và **có đáng không**? Bạn đã thử
 hỏi cùng một câu trên cả hai (`make serve` vs `.venv/bin/python labs/02-serve/serve.py --compare`)
 chưa? Chất lượng khác nhau thế nào?
 
-_Answer here._
+2-bit nhỏ hơn 0.73 GB (~25%) nhưng decode **chậm hơn 1.9x** (7.8 vs 14.9 tok/s; `llama-bench` chạy lại xen kẽ cho 1.7x, nên không phải do máy giảm xung). Ở máy compute-limited như i5 + iGPU, chi phí dequantize Q2_K lớn hơn phần byte tiết kiệm. Tôi hỏi cùng 3 câu trên cả hai server: chất lượng gần nhau, Q2 kém gọn hơn chút, nhưng chậm hơn rõ rệt nên **không đáng dùng**. TTFT P95 bị kéo bởi request đầu (cold cache).
 
 ---
 
@@ -60,22 +60,22 @@ _Answer here._
 
 | Users | RPS | P50 (ms) | P95 (ms) | P99 (ms) | Eff. concurrency | Failures |
 |--:|--:|--:|--:|--:|--:|--:|
-| 10 | | | | | | |
-| 50 | | | | | | |
+| 10 | 0.39 | 22000 | 30000 | 35000 | 8.7 | 0.0% |
+| 50 | 0.37 | 53000 | 92000 | 94000 | 19.3 | 0.0% |
 
-- **Offered load tăng 5×, throughput thực tăng:** _<X.XX>×_
-- **P95 tăng:** _<X.XX>×_
-- **Effective concurrency ở 50 users:** _<số>_ so với `--parallel` = _<số>_ slots
+- **Offered load tăng 5×, throughput thực tăng:** 0.94× (throughput đi ngang: 0.39 → 0.37 RPS)
+- **P95 tăng:** 3.07× (30 s → 92 s; vẫn là ước lượng thấp vì locust chỉ tính request đã xong)
+- **Effective concurrency ở 50 users:** 19.3 so với `--parallel` = 4 slots (10 user: 8.7)
 
 **Peak `llamacpp:n_busy_slots_per_decode`** (từ `make metrics` khi `make load-50` đang
-chạy): _<số>_ / _<slots>_ slots
+chạy): 4.00 / 4 slots (`processing=4`, `deferred=46`)
 
 **Saturation reading** (≤ 80 chữ): server của bạn bão hoà ở đâu, và **bằng chứng nào**
 thuyết phục bạn? Nếu P95 tăng nhanh hơn RPS thì phần latency thêm đó là queue time hay
 compute time — bạn biết bằng cách nào? Nếu bạn phải nâng goodput@SLO, bạn sẽ đổi knob
 nào **trước**, và vì sao knob đó?
 
-_Answer here._
+Server đã bão hoà ở mức 10 user hoặc sớm hơn (tôi chỉ đo 10 và 50). Bằng chứng: tải 5× nhưng throughput đi ngang (0.94×) còn P95 tăng 3.07×; effective concurrency 8.7 ở 10 user và 19.3 ở 50 user, so với 4 slot; server báo `processing=4`, `deferred=46`. Phần tải thêm thành queue time, không phải compute: P95 tăng nhanh hơn RPS. Batching chỉ cho ~18 tok/s tổng so với ~13 tok/s một request (~1.4×). Với SLO P95 ≤ 30 s, 10 user vừa đạt, 50 user không đạt (goodput tối đa ~0.19 req/s). Knob đổi trước: giảm công việc mỗi request (`max_tokens`, context RAG ngắn hơn, model nhỏ hơn), không phải `--parallel`. Mẫu nhỏ (69 và 35 request; 10 user chạy 3 phút, 50 user chạy 100 giây vì 3 phút gây ReadTimeout).
 
 ---
 
@@ -85,23 +85,23 @@ _Answer here._
 
 | Day | Piece | Real hay stub? |
 |---|---|---|
-| N16 Cloud/IaC | | |
-| N17 Data pipeline | | |
-| N18 Lakehouse | | |
-| N19 Vector + features | | |
+| N16 Cloud/IaC | `infra/Dockerfile` + `docker-compose.yml`, chỉ validate (`docker compose config`), chưa build/deploy | một phần |
+| N17 Data pipeline | `labs/03-integrate/stack.py`: ingest 17 file → 265 chunk, nạp tăng dần theo sha256 | real (local) |
+| N18 Lakehouse | SQLite medallion bronze/silver/gold (không phải Iceberg/Delta) | một phần (SQLite thay thế) |
+| N19 Vector + features | embedding thật (nomic-embed-text-v1.5, 768 chiều) + cosine chính xác trên 265 vector | real (không phải ANN) |
 | N20 Serving | `llama-server` | real |
 
-**Latency split** (mean của 3 query, từ output của `pipeline.py`):
+**Latency split** (mean của 3 query, retrieval thật, cache lạnh, từ `pipeline.py --lakehouse`):
 
-- embed: _<ms>_
-- retrieve: _<ms>_
-- llm: _<ms>_
-- **stage chiếm nhiều nhất:** _<stage>_ (_<%>_ của total)
+- embed: 390.6 ms (lần đầu 719 ms, sau đó 204–249 ms)
+- retrieve: 0.1 ms
+- llm: 3563.3 ms
+- **stage chiếm nhiều nhất:** llm (89% của total, 3983.4 ms)
 
 **Reflection** (≤ 60 chữ): bottleneck ở đâu? Có khớp với kỳ vọng của bạn không? Nếu
 phải giảm latency của pipeline này 2×, bạn sẽ tấn công vào đâu?
 
-_Answer here._
+Bottleneck là llm (89%), đúng kỳ vọng; retrieval gần như miễn phí với 265 vector. Trong llm, prefill ~350 token (1.7–2.2 s) chiếm hơn nửa vì context retrieve làm prompt dài, decode ~22 token (1.2–1.5 s). Muốn giảm 2× tôi tấn công prefill: prompt ngắn hơn và giữ system prompt giống nhau từng byte để dùng lại prefix cache (chạy lại cùng prompt cho 3983 → 2067 ms, 1.9×, chỉ đúng khi prompt lặp lại). Phát hiện khi đo: `localhost` thêm ~2.1 s mỗi kết nối httpx mới trên Windows (server chỉ bind IPv4); tôi đổi mặc định sang `127.0.0.1`, và đó chính là khoảng chênh ~2 s mà lần đo đầu chưa giải thích được. Corpus `data/corpus/serving-notes.md` do tôi viết (lặp lại các sự kiện của TOY_DOCS) để câu hỏi có đáp án trong dữ liệu.
 
 ---
 
@@ -111,12 +111,12 @@ _Answer here._
 > một before/after thật (`benchmarks/01-tuning-tg128.md`). Đổi quantization,
 > `LAB_N_CTX`, hay `--parallel` rồi đo lại cũng được.
 
-**Change:** _<vd: hạ -t từ 16 xuống 8; vd: đổi sang UD-Q2_K_XL; vd: --parallel 4 → 8>_
+**Change:** giữ quantization UD-Q4_K_XL thay vì UD-Q2_K_XL (số thread không đổi được gì: 1.04×)
 
 ```
-before:  <số + đơn vị>
-after:   <số + đơn vị>
-speedup: <X.Y>×
+before:  7.8 tok/s decode (UD-Q2_K_XL, `make bench`)
+after:   14.9 tok/s decode (UD-Q4_K_XL, `make bench`)
+speedup: 1.91× (llama-bench chạy lại: 7.7 → 13.3 tok/s = 1.73×)
 ```
 
 **Tại sao nó work** (1–2 đoạn — đây là phần grader đọc kỹ nhất):
@@ -126,7 +126,9 @@ memory bandwidth? vector width? cache residency? scheduling? queueing? Nếu k�
 **khác** với kỳ vọng từ deck — nói rõ, và giải thích vì sao. Grader thưởng điểm cho
 lập luận đúng về một kết quả bất ngờ, hơn là một con số đẹp không được giải thích._
 
-_Answer here._
+Thay đổi tôi kỳ vọng sẽ quan trọng nhất là số thread, nhưng `make tune` cho kết quả ngược kỳ vọng: đường cong phẳng ngay từ 1 thread (11.7 → 12.7 tok/s, chỉ 1.09× toàn dải, 1.04× so với mặc định `-t 4`). Decode đọc lại toàn bộ weights hoạt động cho mỗi token, và trên máy này RAM dùng chung giữa CPU và iGPU nên băng thông bộ nhớ đã bão hoà từ rất ít thread; thêm thread chỉ thêm tranh chấp. Đối chứng: `-ngl 0` (14.1 tok/s) và `-ngl 99` (13.7 tok/s) gần như bằng nhau, tức đổi bên tính toán không giúp - điểm nghẽn là bộ nhớ.
+
+Thay đổi có tác dụng thật là quantization, theo hướng bất ngờ: bản 2-bit nhỏ hơn 25% nhưng chậm hơn 1.9×. Nếu decode thuần bandwidth-bound thì ít byte hơn phải nhanh hơn; thực tế Q2_K cần nhiều phép giải nén hơn (scale/min lồng nhau) và máy này không bandwidth-bound thuần, nên chi phí dequantize lớn hơn phần byte tiết kiệm. Tôi chạy lại xen kẽ Q2/Q4 để loại trừ giảm xung nhiệt: kết quả lặp lại (7.5–8.0 vs 13.2–13.4 tok/s). Bài học: "ít bit hơn" không tự động là nhanh hơn, phải đo trên đúng máy.
 
 ---
 
@@ -185,4 +187,4 @@ xem được → 0 điểm.
 
 ## 9. Khai báo sử dụng AI  *(xem `docs/RULES.md` §3)*
 
-_(Công cụ nào, dùng vào việc gì. Ghi "Không dùng" nếu không dùng.)_
+_Claude Code (Anthropic): chạy các lệnh lab, sửa lỗi `lab.ps1` (BOM + UTF-8), và soạn nháp phần nhận xét/REFLECTION dựa trên số đo thật trong `benchmarks/`, viết `labs/03-integrate/stack.py` (N17–N19), `infra/` (N16) và tự chụp các screenshot từ cửa sổ console thật. Tôi đã đọc và chịu trách nhiệm về nội dung._

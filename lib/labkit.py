@@ -161,7 +161,9 @@ def embed_port() -> int:
 
 
 def base_url(port: int | None = None) -> str:
-    return f"http://localhost:{port or server_port()}"
+    # 127.0.0.1, not localhost: llama-server binds IPv4 only, and on Windows httpx tries
+    # ::1 first, adding ~2 s to every new connection.
+    return f"http://127.0.0.1:{port or server_port()}"
 
 
 # ─────────────────────────────────────────────────────────── paths

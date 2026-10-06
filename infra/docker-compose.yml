@@ -1,0 +1,41 @@
+# N16 - the lab's serving topology as code: one chat server + one embedding server.
+# Flags mirror lib/labkit.py server_cmd(): --parallel 4 --cont-batching --metrics,
+# --reasoning off, ctx 2048, threads 4. Ports bind to loopback only.
+#
+#   docker compose -f infra/docker-compose.yml up --build
+#   docker compose -f infra/docker-compose.yml config      # validate without Docker daemon
+x-llama: &llama
+  build:
+    context: .
+    args:
+      LLAMA_CPP_BUILD: b10488
+  restart: unless-stopped
+  volumes:
+    - ../models:/models:ro
+
+services:
+  llm:
+    <<: *llama
+    command: >
+      -m /models/gemma-4-E2B-it-UD-Q4_K_XL.gguf --host 0.0.0.0 --port 8080
+      -t 4 --ctx-size 2048 --parallel 4 --cont-batching --metrics --reasoning off
+    ports: ["127.0.0.1:8080:8080"]
+    deploy:
+      resources:
+        limits: { memory: 6g }
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /health HTTP/1.0\r\n\r\n' >&3 && grep -q 200 <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  embed:
+    <<: *llama
+    command: >
+      -m /models/nomic-embed-text-v1.5.Q4_K_M.gguf --host 0.0.0.0 --port 8081
+      -t 4 --ctx-size 2048 --embedding --pooling mean
+    ports: ["127.0.0.1:8081:8081"]
+    deploy:
+      resources:
+        limits: { memory: 1g }

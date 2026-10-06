@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 import httpx
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "lib"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import labkit  # noqa: E402
 
 SYSTEM_PROMPT = (
@@ -76,9 +77,33 @@ def embed(texts: list[str], embed_url: str | None) -> list[list[float]] | None:
         return None
 
 
+LAKEHOUSE_DB: str | None = None   # set by --lakehouse; see stack.py (N17-N19)
+_INDEX = None
+
+
+def retrieve_lakehouse(query: str, k: int, embed_url: str) -> tuple[list[Doc], dict, str]:
+    """Real N19 path: embed the query, exact cosine search over the gold table."""
+    global _INDEX
+    import numpy as np
+    import stack  # labs/03-integrate/stack.py
+    if _INDEX is None:
+        _INDEX = stack.VectorIndex(pathlib.Path(LAKEHOUSE_DB))
+    t0 = time.perf_counter()
+    qv = stack.embed([_INDEX.query_prefix + query], embed_url)[0]
+    embed_ms = (time.perf_counter() - t0) * 1000.0
+    t0 = time.perf_counter()
+    hits = _INDEX.search(np.asarray(qv, dtype=np.float32), k)
+    retrieve_ms = (time.perf_counter() - t0) * 1000.0
+    docs = [Doc(cid, text, score) for cid, text, score in hits]
+    return docs, {"embed": round(embed_ms, 1), "retrieve": round(retrieve_ms, 1)}, (
+        f"lakehouse vector index ({len(_INDEX.ids)} chunks) + llama-server /v1/embeddings")
+
+
 def retrieve(query: str, k: int = 3,
              embed_url: str | None = None) -> tuple[list[Doc], dict, str]:
     """STUB 2: replace with your N19 vector search. Returns (docs, timings_ms)."""
+    if LAKEHOUSE_DB and embed_url:
+        return retrieve_lakehouse(query, k, embed_url)
     t0 = time.perf_counter()
     vectors = embed([query] + [d["text"] for d in TOY_DOCS], embed_url)
     embed_ms = (time.perf_counter() - t0) * 1000.0
@@ -163,12 +188,20 @@ QUERIES = [
 def main() -> int:
     ap = argparse.ArgumentParser(description="RAG pipeline against local llama-server.")
     port = labkit.server_port()
-    ap.add_argument("--base-url", default=f"http://localhost:{port}")
+    ap.add_argument("--base-url", default=f"http://127.0.0.1:{port}")  # not localhost: see labkit.base_url
     ap.add_argument("--embed-url", default=None,
                     help=f"Embedding server, e.g. http://localhost:{labkit.embed_port()} "
                          "(bonus C9). Omit to use keyword retrieval.")
     ap.add_argument("--k", type=int, default=3)
+    ap.add_argument("--lakehouse", default=None,
+                    help="SQLite lakehouse built by stack.py (needs --embed-url). "
+                         "Replaces the toy keyword retrieval with the real N17-N19 stack.")
     args = ap.parse_args()
+    global LAKEHOUSE_DB
+    if args.lakehouse:
+        if not args.embed_url:
+            labkit.die("--lakehouse needs --embed-url.", "Start one with: make serve-embed")
+        LAKEHOUSE_DB = args.lakehouse
 
     labkit.banner("03 - RAG pipeline")
     print(f"  llama-server : {args.base_url}")

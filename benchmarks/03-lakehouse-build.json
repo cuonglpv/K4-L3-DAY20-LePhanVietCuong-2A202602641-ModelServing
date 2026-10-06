@@ -1,0 +1,20 @@
+{
+  "db": "data/lakehouse.db",
+  "ingest": {
+    "files": 17,
+    "new": 17,
+    "changed": 0,
+    "unchanged": 0,
+    "chunks": 265
+  },
+  "embedded_now": 265,
+  "tables": {
+    "bronze_docs": 17,
+    "silver_chunks": 265,
+    "gold_embeddings": 265
+  },
+  "dim": 768,
+  "embed_model": "nomic-embed-text-v1.5.Q4_K_M (mean pooling)",
+  "ingest_s": 0.03,
+  "embed_s": 38.78
+}

@@ -1,4 +1,4 @@
-<#
+﻿<#
   Windows runner — the equivalent of `make <target>` for students without make.
 
   Works in Windows PowerShell 5.1 (powershell.exe) and PowerShell 7+ (pwsh).
@@ -21,6 +21,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
+
+# Python scripts print box-drawing characters; without this they crash on cp1252 when piped.
+$env:PYTHONUTF8 = '1'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $VenvPy = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 $Port   = if ($env:LAB_SERVER_PORT) { $env:LAB_SERVER_PORT } else { '8080' }

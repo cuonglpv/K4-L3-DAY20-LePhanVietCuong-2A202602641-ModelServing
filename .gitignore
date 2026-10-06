@@ -37,3 +37,6 @@ benchmarks/.llama-server.log
 #   benchmarks/*.md, *.json          rubric items 3, 4, 5, 9, 10, 12, 13 + bonus
 #   benchmarks/locust-*_stats.csv    input to `make load-report`
 #   submission/**                    your report + screenshots
+
+# N18 lakehouse is rebuilt by labs/03-integrate/stack.py; keep the build report, not the binary DB
+data/*.db
