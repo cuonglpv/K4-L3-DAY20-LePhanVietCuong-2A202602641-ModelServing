@@ -50,7 +50,7 @@ Hai chỗ phải xử lý. (1) `lab.ps1` lỗi parse trên Windows PowerShell 5.
 hỏi cùng một câu trên cả hai (`make serve` vs `.venv/bin/python labs/02-serve/serve.py --compare`)
 chưa? Chất lượng khác nhau thế nào?
 
-2-bit nhỏ hơn 0.73 GB (~25%) nhưng decode **chậm hơn 1.9x** (7.8 vs 14.9 tok/s; `llama-bench` chạy lại xen kẽ cho 1.7x, nên không phải do máy giảm xung). Ở máy compute-limited như i5 + iGPU, chi phí dequantize Q2_K lớn hơn phần byte tiết kiệm. Tôi hỏi cùng 3 câu trên cả hai server: chất lượng gần nhau, Q2 kém gọn hơn chút, nhưng chậm hơn rõ rệt nên **không đáng dùng**. TTFT P95 bị kéo bởi request đầu (cold cache).
+2-bit nhỏ hơn 0.73 GB (~25%) nhưng decode **chậm hơn 1.9x** trên cấu hình mặc định (7.8 vs 14.9 tok/s; `llama-bench` chạy lại xen kẽ cho 1.7x nên không phải do giảm xung). Nguyên nhân tôi tìm ra: `make bench` chạy `-ngl 99` nên decode nằm trên iGPU (Vulkan), nơi kernel Q2_K chậm hơn Q4_K; ở CPU-only chiều hướng đảo ngược (Q2 nhanh hơn ~1.4x, nhiễu lớn). Tôi hỏi cùng 3 câu trên cả hai server: chất lượng gần nhau, Q2 kém gọn hơn chút, nên chọn Q4. TTFT P95 bị kéo bởi request đầu (cold cache).
 
 ---
 
@@ -126,9 +126,9 @@ memory bandwidth? vector width? cache residency? scheduling? queueing? Nếu k�
 **khác** với kỳ vọng từ deck — nói rõ, và giải thích vì sao. Grader thưởng điểm cho
 lập luận đúng về một kết quả bất ngờ, hơn là một con số đẹp không được giải thích._
 
-Thay đổi tôi kỳ vọng sẽ quan trọng nhất là số thread, nhưng `make tune` cho kết quả ngược kỳ vọng: đường cong phẳng ngay từ 1 thread (11.7 → 12.7 tok/s, chỉ 1.09× toàn dải, 1.04× so với mặc định `-t 4`). Decode đọc lại toàn bộ weights hoạt động cho mỗi token, và trên máy này RAM dùng chung giữa CPU và iGPU nên băng thông bộ nhớ đã bão hoà từ rất ít thread; thêm thread chỉ thêm tranh chấp. Đối chứng: `-ngl 0` (14.1 tok/s) và `-ngl 99` (13.7 tok/s) gần như bằng nhau, tức đổi bên tính toán không giúp - điểm nghẽn là bộ nhớ.
+Thay đổi tôi kỳ vọng sẽ quan trọng nhất là số thread, nhưng `make tune` cho kết quả ngược kỳ vọng: đường cong phẳng ngay từ 1 thread (11.7 → 12.7 tok/s, 1.09× toàn dải, 1.04× so với `-t 4`). Ban đầu tôi giải thích bằng băng thông bộ nhớ, và giải thích đó **sai**: tôi chỉ nhìn đường cong ở `-ngl 99`, tức decode đang chạy trên iGPU nên CPU thread gần như không phải bên tính toán. Khi chạy lại ở CPU-only (`-ngl 0`) đường cong có đúng hình mong đợi: 1 thread 3.9, 2 thread 7.1, 4 thread 8.7 (knee ở 4 core vật lý), 8 thread 8.6 tok/s (thread logic không thêm gì vì chia sẻ ALU/cache/cổng bộ nhớ với thread cùng core).
 
-Thay đổi có tác dụng thật là quantization, theo hướng bất ngờ: bản 2-bit nhỏ hơn 25% nhưng chậm hơn 1.9×. Nếu decode thuần bandwidth-bound thì ít byte hơn phải nhanh hơn; thực tế Q2_K cần nhiều phép giải nén hơn (scale/min lồng nhau) và máy này không bandwidth-bound thuần, nên chi phí dequantize lớn hơn phần byte tiết kiệm. Tôi chạy lại xen kẽ Q2/Q4 để loại trừ giảm xung nhiệt: kết quả lặp lại (7.5–8.0 vs 13.2–13.4 tok/s). Bài học: "ít bit hơn" không tự động là nhanh hơn, phải đo trên đúng máy.
+Thay đổi có tác dụng thật trên cấu hình mặc định là chọn quantization, theo hướng bất ngờ: 2-bit nhỏ hơn 25% nhưng chậm hơn 1.9×. Nếu decode thuần bandwidth-bound thì ít byte hơn phải nhanh hơn, và thật vậy ở CPU-only Q2 nhanh hơn Q4. Cái làm Q2 chậm là backend: trên iGPU Iris Xe qua Vulkan, Q2 chỉ 6.7–7.3 tok/s so với Q4 10.5–12.0. Tôi kiểm chứng được sự đảo chiều giữa hai backend, nhưng chưa kiểm chứng được nguyên nhân bên trong kernel Vulkan. Bài học: "ít bit hơn" không tự động nhanh hơn; kết quả phụ thuộc vào bên nào đang tính (CPU hay iGPU), và đo lặp lại là bắt buộc vì các lần chạy cùng cấu hình dao động tới ~25%.
 
 ---
 
@@ -137,27 +137,23 @@ Thay đổi có tác dụng thật là quantization, theo hướng bất ngờ: 
 > Bỏ trống nếu không làm. Xem `docs/bonus/README.md`. Đừng làm hết — **một** finding sâu
 > ăn điểm hơn năm bảng nông.
 
-**Đã làm:** _<B1 build-compare / B2 sweep nào / B4 challenge nào / B5 lựa chọn nào>_
+**Đã làm:** B2 (`make sweep-gpu` → `benchmarks/bonus-gpu-offload-sweep.md`), B3 (before/after bên dưới) và B5 chọn C9 (embedding serving → `benchmarks/bonus-embed-demo.md`). Không làm B1: máy không có cmake/compiler C++.
 
-**Numbers:**
+**Numbers** (GPU offload, Q4_K_XL, 4 thread, `tg` decode; median của các lần `llama-bench` xen kẽ):
 
 ```
-before:  <số>
-after:   <số>
-speedup: <X.Y>×
+before:  8.9 tok/s   (-ngl 0, CPU-only, median 10 lần, khoảng 6.3-10.6)
+after:   10.8 tok/s  (-ngl 99, full offload iGPU, median 6 lần, khoảng 10.4-12.4)
+speedup: 1.21x       (lần sweep đơn: 7.8 -> 10.8 = 1.39x)
 ```
 
-**Điều này nói lên gì mà deck chưa nói:**
-
-_(để trống nếu bạn không làm phần này)_
+**Điều này nói lên gì mà deck chưa nói:** trên laptop UMA, offload lên iGPU chỉ cho lợi ích vừa phải (~1.2×) vì CPU và iGPU cùng đọc một bus RAM; không có VRAM riêng để "hết chỗ" nên đường cong tăng đều chứ không có đỉnh. Quan trọng hơn, nó đổi cách đọc các kết quả base: vì `-ngl 99` là mặc định nên `make tune` đo một iGPU gần như không phụ thuộc thread (phẳng), còn CPU-only mới cho knee ở 4 core vật lý (3.9 → 7.1 → 8.7 → 8.6 tok/s); và Q2_K chậm hơn Q4_K chỉ ở đường Vulkan, ngược lại ở CPU. Với C9: embedding là regime prefill-bound, throughput tăng 9× từ batch 1 lên 16 (4.9 → 43.9 texts/s) trong khi latency chỉ tăng 1.8×.
 
 ---
 
 ## 7. Điều làm bạn ngạc nhiên nhất  *(optional)*
 
-_(1–2 câu. Không bắt buộc, nhưng grader đọc hết.)_
-
-_(để trống nếu bạn không làm phần này)_
+Hai giải thích đầu tiên của tôi (thread phẳng do băng thông; Q2 chậm do giải nén) đều sai hoặc thiếu vì tôi không để ý `-ngl 99` mặc định đẩy decode sang iGPU, và `localhost` trên Windows thêm ~2 s mỗi kết nối. Cả hai chỉ lộ ra khi tôi chạy thêm một thí nghiệm đối chứng; tôi đã sửa lại các phần liên quan thay vì giữ lập luận ban đầu.
 
 ---
 
