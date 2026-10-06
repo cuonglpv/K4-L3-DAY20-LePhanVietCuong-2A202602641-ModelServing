@@ -61,11 +61,11 @@ chưa? Chất lượng khác nhau thế nào?
 | Users | RPS | P50 (ms) | P95 (ms) | P99 (ms) | Eff. concurrency | Failures |
 |--:|--:|--:|--:|--:|--:|--:|
 | 10 | 0.39 | 22000 | 30000 | 35000 | 8.7 | 0.0% |
-| 50 | 0.37 | 53000 | 92000 | 94000 | 19.3 | 0.0% |
+| 50 | 0.42 | 51000 | 93000 | 95000 | 19.8 | 0.0% |
 
-- **Offered load tăng 5×, throughput thực tăng:** 0.94× (throughput đi ngang: 0.39 → 0.37 RPS)
-- **P95 tăng:** 3.07× (30 s → 92 s; vẫn là ước lượng thấp vì locust chỉ tính request đã xong)
-- **Effective concurrency ở 50 users:** 19.3 so với `--parallel` = 4 slots (10 user: 8.7)
+- **Offered load tăng 5×, throughput thực tăng:** 1.06× (throughput gần như đi ngang: 0.39 → 0.42 RPS)
+- **P95 tăng:** 3.10× (30 s → 93 s; vẫn là ước lượng thấp vì locust chỉ tính request đã xong)
+- **Effective concurrency ở 50 users:** 19.8 so với `--parallel` = 4 slots (10 user: 8.7)
 
 **Peak `llamacpp:n_busy_slots_per_decode`** (từ `make metrics` khi `make load-50` đang
 chạy): 4.00 / 4 slots (`processing=4`, `deferred=46`)
@@ -75,7 +75,7 @@ thuyết phục bạn? Nếu P95 tăng nhanh hơn RPS thì phần latency thêm 
 compute time — bạn biết bằng cách nào? Nếu bạn phải nâng goodput@SLO, bạn sẽ đổi knob
 nào **trước**, và vì sao knob đó?
 
-Server đã bão hoà ở mức 10 user hoặc sớm hơn (tôi chỉ đo 10 và 50). Bằng chứng: tải 5× nhưng throughput đi ngang (0.94×) còn P95 tăng 3.07×; effective concurrency 8.7 ở 10 user và 19.3 ở 50 user, so với 4 slot; server báo `processing=4`, `deferred=46`. Phần tải thêm thành queue time, không phải compute: P95 tăng nhanh hơn RPS. Batching chỉ cho ~18 tok/s tổng so với ~13 tok/s một request (~1.4×). Với SLO P95 ≤ 30 s, 10 user vừa đạt, 50 user không đạt (goodput tối đa ~0.19 req/s). Knob đổi trước: giảm công việc mỗi request (`max_tokens`, context RAG ngắn hơn, model nhỏ hơn), không phải `--parallel`. Mẫu nhỏ (69 và 35 request; 10 user chạy 3 phút, 50 user chạy 100 giây vì 3 phút gây ReadTimeout).
+Server đã bão hoà ở mức 10 user hoặc sớm hơn (tôi chỉ đo 10 và 50). Bằng chứng: tải 5× nhưng throughput gần như đi ngang (1.06×) còn P95 tăng 3.10×; effective concurrency 8.7 ở 10 user và 19.8 ở 50 user, so với 4 slot; server báo `processing=4`, `deferred=46`. Phần tải thêm thành queue time, không phải compute: P95 tăng nhanh hơn RPS. Batching chỉ cho ~23 tok/s tổng so với ~13 tok/s một request (~1.8×). Với SLO P95 ≤ 30 s, 10 user vừa đạt, 50 user không đạt (goodput tối đa ~0.21 req/s). Knob đổi trước: giảm công việc mỗi request (`max_tokens`, context RAG ngắn hơn, model nhỏ hơn), không phải `--parallel`. Mẫu nhỏ (69 và 40 request; 10 user chạy 3 phút, 50 user chạy 100 giây vì 3 phút gây ReadTimeout).
 
 ---
 
