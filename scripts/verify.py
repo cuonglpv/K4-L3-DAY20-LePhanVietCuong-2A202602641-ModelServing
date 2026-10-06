@@ -71,7 +71,7 @@ def is_committed(path: pathlib.Path) -> bool | None:
     if TRACKED is None:
         return None
     try:
-        rel = str(path.resolve().relative_to(labkit.repo_root()))
+        rel = path.resolve().relative_to(labkit.repo_root()).as_posix()  # git ls-files uses "/" even on Windows
     except ValueError:
         return None
     return rel in TRACKED
